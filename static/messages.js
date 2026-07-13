@@ -1613,7 +1613,7 @@ async function send(){
           const _skillCache = await loadSkillCommands();
           if(Array.isArray(_skillCache) && _skillCache.find(s => s.name === _parsedCmd.name)){
             const _resolved = typeof resolveSkillCommand==='function'
-              ? await resolveSkillCommand(text)
+              ? await resolveSkillCommand(text, S.session && S.session.session_id)
               : null;
             const _skillMessage = String(_resolved&&_resolved.message||'').trim();
             if(_skillMessage){
