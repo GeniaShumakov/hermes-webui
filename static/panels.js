@@ -8238,6 +8238,7 @@ async function filterSettings(query) {
         `<span class="settings-search-arrow">›</span>` +
         `<span class="settings-search-label">${esc(m.label)}</span>`;
       item.addEventListener('click', () => {
+        ++_settingsSearchSeq;
         _navigateToSettingsField(m);
         resultsEl.style.display = 'none';
         resultsEl.innerHTML = '';
