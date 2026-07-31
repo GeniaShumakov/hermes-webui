@@ -21927,7 +21927,7 @@ def _start_chat_stream_for_session(
     diag.stage("worker_thread_start") if diag else None
     worker_target = _run_gateway_chat_streaming if backend_is_gateway else _run_agent_streaming
     worker_kwargs = {"model_provider": model_provider, "goal_related": goal_related}
-    if agent_message and not backend_is_gateway:
+    if agent_message:
         worker_kwargs["agent_message"] = agent_message
     if moa_config and not backend_is_gateway:
         worker_kwargs["moa_config"] = moa_config
@@ -22091,6 +22091,7 @@ def _start_run(
                 StartRunRequest(
                     session_id=s.session_id,
                     message=msg,
+                    agent_message=agent_message,
                     attachments=attachments,
                     workspace=workspace,
                     profile=getattr(s, "profile", None),
@@ -23138,6 +23139,7 @@ def _handle_chat_sync(handler, body):
                 _merge_display_messages_after_agent_result,
                 _restore_display_reasoning_metadata,
                 _restore_reasoning_metadata,
+                _rewrite_context_user_turn,
                 _sanitize_messages_for_agent,
                 _compact_session_image_parts_for_persistence,
                 _context_messages_for_new_turn,
@@ -23217,6 +23219,11 @@ def _handle_chat_sync(handler, body):
             msg,
             source=getattr(s, "pending_user_source", None) or "webui",
         )
+        if agent_message:
+            # RAW/agent-only split: the sync path persists the raw command but
+            # must keep the model context on the resolved skill payload for the
+            # next turn (round-3 re-gate).
+            _rewrite_context_user_turn(s, agent_message, msg)
         _compact_session_image_parts_for_persistence(s)
         # Only auto-generate title when still default; preserves user renames
         if s.title == "Untitled":
