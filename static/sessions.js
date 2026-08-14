@@ -1637,9 +1637,9 @@ async function _switchProfileForSessionLoad(profile){
   if(!name) throw new Error('missing profile');
   if(name===S.activeProfile) return;
   if(typeof _invalidateSessionListRenders==='function') _invalidateSessionListRenders();
-  if(typeof _setProfileSwitchListEmbargo==='function') _setProfileSwitchListEmbargo(true);
-  if(typeof showSessionListSkeleton==='function') showSessionListSkeleton(name);
   try{
+    if(typeof _setProfileSwitchListEmbargo==='function') _setProfileSwitchListEmbargo(true);
+    if(typeof showSessionListSkeleton==='function') showSessionListSkeleton(name);
     const data=await api('/api/profile/switch',{method:'POST',body:JSON.stringify({name}),timeoutToast:false});
     S.activeProfile=data.active||name;
     S.activeProfileIsDefault=!!data.is_default;

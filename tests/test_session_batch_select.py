@@ -88,6 +88,9 @@ def test_batch_select_scope_changes_clear_stale_ids():
     panel_switch = panels[panel_switch_start:panels.index("\nfunction openProfileCreate", panel_switch_start)]
     assert "_resetSessionSelectionForScopeChange()" in source_filter
     assert "_resetSessionSelectionForScopeChange()" not in profile_skeleton
+    assert session_switch.index("try{") < session_switch.index(
+        "_setProfileSwitchListEmbargo(true)"
+    ) < session_switch.index("showSessionListSkeleton(name)")
     assert session_switch.index("S.activeProfile=data.active||name") < session_switch.index(
         "_resetSessionSelectionForScopeChange()"
     ) < session_switch.index("}catch(switchErr)")
