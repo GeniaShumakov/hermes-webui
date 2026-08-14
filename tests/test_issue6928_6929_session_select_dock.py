@@ -44,6 +44,7 @@ def _fixture_script() -> str:
     functions = [
         "_setActiveProjectFilter",
         "_toggleArchivedSessionsVisibility",
+        "_setProfileSwitchListEmbargo",
         "_focusSessionBatchControl",
         "_resetSessionSelectionForScopeChange",
         "_pruneSessionSelectionToCurrentScope",
@@ -65,6 +66,7 @@ def _fixture_script() -> str:
             "const _selectedSessions = new Set();",
             "let _batchProjectPickerCleanup = null;",
             "let _showArchived = false;",
+            "let _profileSwitchListEmbargo = false;",
             "const SESSION_ARCHIVED_PAGE_SIZE = 50;",
             "let _archivedRowsLoadedLimit = 0;",
             "const NO_PROJECT_FILTER = '__none__';",
@@ -275,6 +277,59 @@ def test_scope_replacement_releases_selection_state():
         manager.stop()
 
 
+def test_pending_profile_switch_hides_actions_without_losing_selection():
+    manager, browser, page = _browser_page({"width": 300, "height": 640})
+    try:
+        page.get_by_role("button", name="Select", exact=True).click()
+        page.locator('.session-select-cb[data-sid="session-1"]').check()
+        dock = page.locator("#sessionBatchDock")
+
+        page.evaluate("_setProfileSwitchListEmbargo(true)")
+        assert not dock.is_visible()
+        assert dock.evaluate("el => el.inert") is True
+        assert dock.get_attribute("aria-busy") == "true"
+        assert page.evaluate("window.__sessionSelectionState()") == {
+            "mode": True,
+            "selected": ["session-1"],
+        }
+
+        page.evaluate("_setProfileSwitchListEmbargo(false)")
+        assert dock.is_visible()
+        assert dock.evaluate("el => el.inert") is False
+        assert dock.get_attribute("aria-busy") is None
+        assert page.get_by_text("1 selected", exact=True).is_visible()
+    finally:
+        browser.close()
+        manager.stop()
+
+
+def test_narrow_sidebar_reflows_localized_batch_controls():
+    manager, browser, page = _browser_page({"width": 180, "height": 760})
+    try:
+        page.get_by_role("button", name="Select", exact=True).click()
+        page.locator('.session-select-cb[data-sid="session-1"]').check()
+        page.locator("#batchSelectAllBtn").evaluate("el => { el.textContent='Alle abwählen'; }")
+        page.locator("#batchArchiveBtn").evaluate("el => { el.textContent='Archivieren'; }")
+        page.locator("#batchMoveBtn").evaluate("el => { el.textContent='Zum Projekt verschieben'; }")
+
+        assert page.locator(".batch-selection-controls").evaluate(
+            "el => getComputedStyle(el).gridTemplateColumns.split(' ').length === 2"
+        )
+        assert page.locator(".batch-action-buttons").evaluate(
+            "el => getComputedStyle(el).gridTemplateColumns.split(' ').length === 1"
+        )
+        assert page.locator("#batchActionBar button").evaluate_all(
+            "buttons => buttons.every(button => button.scrollWidth <= button.clientWidth)"
+        )
+        count_box = page.locator(".batch-count").bounding_box()
+        exit_box = page.locator("#batchExitSelectBtn").bounding_box()
+        assert count_box and exit_box
+        assert count_box["y"] >= exit_box["y"] + 30
+    finally:
+        browser.close()
+        manager.stop()
+
+
 def test_project_filter_change_releases_hidden_selection_state():
     manager, browser, page = _browser_page({"width": 300, "height": 640})
     try:
@@ -365,6 +420,9 @@ def test_batch_move_picker_is_bounded_and_keyboard_accessible():
             "document.activeElement && document.activeElement.textContent === 'No project'"
         )
         assert picker.evaluate("el => el.scrollHeight > el.clientHeight")
+        assert picker.locator(".project-picker-item").evaluate_all(
+            "items => items.every(item => item.getBoundingClientRect().height >= 44)"
+        )
 
         page.evaluate("_renderBatchActionBar()")
         page.wait_for_timeout(100)

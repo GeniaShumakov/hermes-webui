@@ -5185,7 +5185,16 @@ if(typeof window!=='undefined') window._invalidateSessionListRenders = _invalida
 // skeleton. The switch sets it before showSessionListSkeleton() and clears it immediately
 // before its own renderSessionList() (and in the failure-restore path).
 let _profileSwitchListEmbargo = false;
-function _setProfileSwitchListEmbargo(on){ _profileSwitchListEmbargo = !!on; }
+function _setProfileSwitchListEmbargo(on){
+  _profileSwitchListEmbargo=!!on;
+  const dock=$('sessionBatchDock');
+  if(dock){
+    dock.hidden=_profileSwitchListEmbargo;
+    dock.inert=_profileSwitchListEmbargo;
+    if(_profileSwitchListEmbargo)dock.setAttribute('aria-busy','true');
+    else dock.removeAttribute('aria-busy');
+  }
+}
 if(typeof window!=='undefined') window._setProfileSwitchListEmbargo = _setProfileSwitchListEmbargo;
 
 function animateNextSessionListRefresh(options={}){
