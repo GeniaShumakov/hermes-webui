@@ -118,13 +118,12 @@ def _read_canonical_gateway_pid(pid_file: Path) -> int | None:
         # Non-JSON content, or a JSON value json.loads refused (e.g. an
         # oversized integer beyond the interpreter's digit-conversion limit).
         # ``json.JSONDecodeError`` and ``UnicodeDecodeError`` are ValueError
-        # subclasses, so this also covers malformed JSON.  Fall back to a
-        # legacy plain-integer file (e.g. "4242").
-        try:
-            value = int(raw)
-        except ValueError:
-            return None
-        return value if type(value) is int else None
+        # subclasses, so this also covers malformed JSON.  Fail closed: a
+        # legacy plain-integer file (e.g. ``4242``) is itself valid JSON and is
+        # still accepted by the ``json.loads`` above, so there is no need for an
+        # ``int(raw)`` fallback — and ``int()`` would wrongly accept non-JSON
+        # forms like ``+4242`` / ``0004242``, violating the strict contract.
+        return None
     if isinstance(payload, dict):
         pid = payload.get("pid")
     else:
@@ -199,14 +198,18 @@ def _subprocess_became_gateway(
         record_time = _record_updated_at_epoch(runtime_status)
         if record_time is None or record_time < proc_started_at:
             return False
-    # Cross-check the recorded PID against the canonical ``gateway.pid`` file
-    # when present.  A mismatching, unreadable, or non-integer pid file means
-    # the record is not the current gateway generation -> fail closed.
+    # Cross-check the recorded PID against the canonical ``gateway.pid`` file.
+    # The real gateway writer creates ``gateway.pid`` BEFORE it flips its
+    # runtime state to ``running``, so a confirmed-running record must be
+    # accompanied by a matching canonical pid file.  A missing, unreadable,
+    # non-integer, or mismatching pid file therefore cannot confirm takeover and
+    # must fail closed (return False -> the child stays on the terminate-on-
+    # timeout path), or a hung restart child whose PID happens to match a stale
+    # future-dated record would escape cleanup and leak.
     pid_file = hermes_home / _GATEWAY_PID_FILE
-    if pid_file.exists():
-        canonical_pid = _read_canonical_gateway_pid(pid_file)
-        if canonical_pid is None or canonical_pid != recorded_pid:
-            return False
+    canonical_pid = _read_canonical_gateway_pid(pid_file)
+    if canonical_pid is None or canonical_pid != recorded_pid:
+        return False
     return True
 
 
