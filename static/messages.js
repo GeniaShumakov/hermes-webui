@@ -7934,6 +7934,26 @@ function _resumeSessionStreamAfterLiveChat(sid) {
   }, 0);
 }
 
+// #6790: Drain queued messages when the tab is re-shown and the agent
+// finished while we were away (SSE was closed by stopSessionStream, so
+// stream_end → setBusy(false) → queue-drain never fired).
+function _drainQueuedMessagesOnTabReveal(sid){
+  if (!sid) return;
+  // If there's a live stream source still open, let its stream_end drain.
+  const live = typeof LIVE_STREAMS !== 'undefined' ? LIVE_STREAMS[sid] : null;
+  if (live && live.source && live.source.readyState !== 2) return;
+  if (typeof getQueuedSessionCount !== 'function') return;
+  if (!getQueuedSessionCount(sid)) return;
+  // The stream reference is stale — the SSE connection was closed by the
+  // browser while the tab was hidden, and stream_end never arrived.
+  // Clean up the stale reference so setBusy(false) can drain the queue.
+  if (S.activeStreamId && S.session && S.session.session_id === sid) {
+    S.activeStreamId = null;
+  }
+  _queueDrainSid = sid;
+  setBusy(false);
+}
+
 function startSessionStream(sid) {
   if (!sid) return;
   // Already on this session? No-op (loadSession is a no-op when re-selecting
@@ -7968,6 +7988,8 @@ function startSessionStream(sid) {
         const resumeSid = _sessionStreamHiddenSid;
         _sessionStreamHiddenSid = null;
         void startSessionStream(resumeSid);
+        // #6790: drain any queued messages stranded while the tab was hidden.
+        _drainQueuedMessagesOnTabReveal(resumeSid);
       }
     });
     document._hermesSessionStreamVisibilityHook = true;
