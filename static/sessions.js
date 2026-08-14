@@ -1643,6 +1643,7 @@ async function _switchProfileForSessionLoad(profile){
     const data=await api('/api/profile/switch',{method:'POST',body:JSON.stringify({name}),timeoutToast:false});
     S.activeProfile=data.active||name;
     S.activeProfileIsDefault=!!data.is_default;
+    _resetSessionSelectionForScopeChange();
     if(typeof _resetCronUnreadForProfileSwitch==='function'){
       _resetCronUnreadForProfileSwitch();
     }
@@ -5214,7 +5215,6 @@ const _SESSION_SKELETON_GROUPS = [
 function showSessionListSkeleton(targetProfile){
   const list = $('sessionList');
   if(!list) return;
-  _resetSessionSelectionForScopeChange();
   // Tear down any active virtual-scroll state up front so a pending scroll-driven
   // render can't repaint the previous profile's cached rows over the skeleton
   // (#4662 Codex gate). Cancel the queued RAF and drop the data-session-virtual-*

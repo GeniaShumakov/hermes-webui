@@ -70,9 +70,11 @@ def test_batch_select_escape_handler():
 
 
 def test_batch_select_scope_changes_clear_stale_ids():
-    """Profile/source replacements must not retain actionable IDs from another scope."""
+    """Only confirmed profile/source replacements clear actionable IDs."""
     with open('static/sessions.js', encoding="utf-8") as f:
         src = f.read()
+    with open('static/panels.js', encoding="utf-8") as f:
+        panels = f.read()
     assert "function _resetSessionSelectionForScopeChange()" in src
     assert "function _pruneSessionSelectionToCurrentScope(sessions,referenceSessions)" in src
     assert "_pruneSessionSelectionToCurrentScope(_allSessions,_sidebarReferenceSessions)" in src
@@ -80,8 +82,18 @@ def test_batch_select_scope_changes_clear_stale_ids():
     source_filter = src[source_start:src.index("function _restoreSessionSourceFilter", source_start)]
     skeleton_start = src.index("function showSessionListSkeleton")
     profile_skeleton = src[skeleton_start:src.index("\nfunction ", skeleton_start + 1)]
+    session_switch_start = src.index("async function _switchProfileForSessionLoad")
+    session_switch = src[session_switch_start:src.index("\nasync function loadSession", session_switch_start)]
+    panel_switch_start = panels.index("async function switchToProfile")
+    panel_switch = panels[panel_switch_start:panels.index("\nfunction openProfileCreate", panel_switch_start)]
     assert "_resetSessionSelectionForScopeChange()" in source_filter
-    assert "_resetSessionSelectionForScopeChange()" in profile_skeleton
+    assert "_resetSessionSelectionForScopeChange()" not in profile_skeleton
+    assert session_switch.index("S.activeProfile=data.active||name") < session_switch.index(
+        "_resetSessionSelectionForScopeChange()"
+    ) < session_switch.index("}catch(switchErr)")
+    assert panel_switch.index("if (_switchGen !== _profileSwitchGeneration) return false") < panel_switch.index(
+        "_resetSessionSelectionForScopeChange()"
+    ) < panel_switch.index("} catch (e)")
 
 
 def test_batch_select_visible_ids_exclude_read_only_sessions():
