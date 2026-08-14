@@ -1643,7 +1643,7 @@ async function _switchProfileForSessionLoad(profile){
     const data=await api('/api/profile/switch',{method:'POST',body:JSON.stringify({name}),timeoutToast:false});
     S.activeProfile=data.active||name;
     S.activeProfileIsDefault=!!data.is_default;
-    _resetSessionSelectionForScopeChange();
+    if(typeof _resetSessionSelectionForScopeChange==='function') _resetSessionSelectionForScopeChange();
     if(typeof _resetCronUnreadForProfileSwitch==='function'){
       _resetCronUnreadForProfileSwitch();
     }
