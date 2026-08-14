@@ -423,3 +423,40 @@ def test_visibility_and_settings_refresh_use_current_quota_provider_helper():
     # Settings toggle in panels.js uses _currentQuotaProvider
     toggle_region = _between(panels_js, "showQuotaChipCb.addEventListener('change'", "_schedulePreferencesAutosave();")
     assert "_currentQuotaProvider()" in toggle_region
+
+
+def test_deferred_model_resolution_refreshes_quota_with_resolved_provider():
+    """#6506 gate fix: after deferred model resolution corrects model_provider
+    (e.g. legacy "default" -> "openai-codex"), the resolved provider's quota must
+    be re-requested so it supersedes the fast-metadata request fired at open."""
+    sessions_js = (ROOT / "static" / "sessions.js").read_text(encoding="utf-8")
+    region = _between(
+        sessions_js,
+        "function _resolveSessionModelForDisplaySoon(",
+        "_deferSessionSideEffect",
+    )
+    # The resolution body assigns model_provider then refreshes quota with it.
+    body = _between(sessions_js, "S.session.model_provider=provider||null;", "syncTopbar();")
+    assert "refreshProviderQuotaIndicator(S.session.model_provider||null)" in body
+
+
+def test_session_clear_paths_refresh_quota_to_current_provider():
+    """#6506 gate fix: every path that nulls S.session for a cross-provider
+    delete/clear/end must immediately refresh the quota to _currentQuotaProvider()
+    so the removed session's provider quota does not linger on the fresh composer."""
+    sessions_js = (ROOT / "static" / "sessions.js").read_text(encoding="utf-8")
+    messages_js = (ROOT / "static" / "messages.js").read_text(encoding="utf-8")
+    # Both S.session=null clear sites in sessions.js refresh quota immediately after.
+    for marker in (
+        "S.session=null;S.messages=[];S.entries=[];localStorage.removeItem('hermes-webui-session');",
+        "S.session=null;S.messages=[];S.entries=[];\n",
+    ):
+        idx = sessions_js.find(marker)
+        assert idx != -1, marker
+        window = sessions_js[idx: idx + 700]
+        assert "refreshProviderQuotaIndicator((typeof _currentQuotaProvider==='function')?_currentQuotaProvider():null)" in window, marker
+    # The messages.js terminal-clear path refreshes quota immediately after nulling.
+    idx = messages_js.find("S.session=null;S.messages=[];")
+    assert idx != -1
+    window = messages_js[idx: idx + 700]
+    assert "refreshProviderQuotaIndicator((typeof _currentQuotaProvider==='function')?_currentQuotaProvider():null)" in window

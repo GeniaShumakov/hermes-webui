@@ -1831,6 +1831,9 @@ async function send(){
       if(!_clarifySessionId || _clarifySessionId===activeSid) hideClarifyCard(true, 'terminal');
       removeThinking();
       S.session=null;S.messages=[];
+      // #6506 (gate): clear the ended session's provider quota so a cross-provider
+      // session ending doesn't leave its quota on the fresh empty composer.
+      if(typeof refreshProviderQuotaIndicator==='function') void refreshProviderQuotaIndicator((typeof _currentQuotaProvider==='function')?_currentQuotaProvider():null);
       setBusy(false);setComposerStatus('');
       if(typeof clearOptimisticSessionStreaming==='function') clearOptimisticSessionStreaming(activeSid);
       if(typeof renderMessages==='function') renderMessages();

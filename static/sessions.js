@@ -2965,6 +2965,11 @@ function _resolveSessionModelForDisplaySoon(sid){
       if(!model||!S.session||S.session.session_id!==sid) return;
       S.session.model=model;
       S.session.model_provider=provider||null;
+      // #6506 (gate): the fast-metadata quota request at session-open fired with
+      // the pre-resolution provider (e.g. legacy "default"). Now that resolution
+      // has corrected model_provider, re-request so the resolved provider's quota
+      // supersedes it — the sequence guard drops it if the session changed.
+      if(typeof refreshProviderQuotaIndicator==='function') void refreshProviderQuotaIndicator(S.session.model_provider||null);
       const resolvedContextLength=data.session.context_length||S.session.context_length||0;
       S.session.context_length=resolvedContextLength;
       S.session.threshold_tokens=data.session.threshold_tokens||0;
@@ -4317,6 +4322,10 @@ function _renderBatchActionBar(){
       ids.forEach(_clearHandoffStorageForSession);
       if(S.session&&ids.includes(S.session.session_id)){
         S.session=null;S.messages=[];S.entries=[];localStorage.removeItem('hermes-webui-session');
+        // #6506 (gate): clear the deleted session's provider quota immediately so a
+        // cross-provider deleted session doesn't leave its quota on the fresh composer;
+        // if a remaining session loads below, the sequence guard supersedes this.
+        if(typeof refreshProviderQuotaIndicator==='function') void refreshProviderQuotaIndicator((typeof _currentQuotaProvider==='function')?_currentQuotaProvider():null);
         if(typeof _hydrateTodosFromSession==='function') _hydrateTodosFromSession(null);
         const remaining=await api('/api/sessions'+_sessionListQueryString());
         if(remaining.sessions&&remaining.sessions.length){await loadSession(remaining.sessions[0].session_id);}
@@ -9066,6 +9075,10 @@ async function deleteSession(sid, beforeDelete=null){
   }
   if(S.session&&S.session.session_id===sid){
     S.session=null;S.messages=[];S.entries=[];
+    // #6506 (gate): clear the deleted session's provider quota immediately so a
+    // cross-provider deletion doesn't leave its quota on the fresh composer; if a
+    // remaining session loads below, the sequence guard supersedes this.
+    if(typeof refreshProviderQuotaIndicator==='function') void refreshProviderQuotaIndicator((typeof _currentQuotaProvider==='function')?_currentQuotaProvider():null);
     if(typeof _hydrateTodosFromSession==='function') _hydrateTodosFromSession(null);
     localStorage.removeItem('hermes-webui-session');
     // load the most recent remaining session, or show blank if none left
