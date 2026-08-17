@@ -3198,11 +3198,6 @@ def _reconcile_cancelled_stream_generation_under_lock(session_id, stream_id, cla
                     context_old_index, context_target_index = _context_turn_bounds(
                         context_remaining,
                     )
-                    context_old_user = (
-                        context_remaining[context_old_index]
-                        if context_old_index >= 0
-                        else None
-                    )
                     context_target = (
                         context_remaining[context_target_index]
                         if context_target_index < len(context_remaining)
@@ -12675,7 +12670,7 @@ def _run_agent_streaming(
                     if _success_previous_pause:
                         s.process_wakeup_pause = copy.deepcopy(_success_previous_pause)
                     else:
-                        clear_process_wakeup_pause(s, reason='run_completed')
+                        s.process_wakeup_pause = {}
                     _materialize_pending_user_turn_before_error(s)
                     s.save()
 

@@ -9328,7 +9328,7 @@ def admit_stream_publication(
     """
     key = _stream_cancel_generation_key(session_id, stream_id)
     if key is None:
-        return False if cancelled and not success_committed and event not in ("cancel", "error", "apperror") else None
+        return False if cancelled and not success_committed and event not in ("cancel", "apperror") else None
     with STREAM_CANCEL_GENERATIONS_LOCK:
         with SESSION_WRITEBACK_OWNERS_LOCK:
             current_owner = SESSION_WRITEBACK_OWNERS.get(key[0])
@@ -9339,24 +9339,24 @@ def admit_stream_publication(
             # tracked even if a successor has already replaced the session's
             # current owner; once retirement starts, reject new admissions.
             if record.get("success_teardown"):
-                return None if event in ("cancel", "error", "apperror") else False
+                return None if event in ("cancel", "apperror") else False
             record["inflight"] += 1
             return key
         if record is not None and record.get("cancel_requested"):
             if record.get("discarded"):
-                if event in ("cancel", "error", "apperror"):
+                if event in ("cancel", "apperror"):
                     return None
                 return False
             if (
                 (record.get("reconcile_started") or cancelled)
                 and not success_committed
-                and event not in ("cancel", "error", "apperror")
+                and event not in ("cancel", "apperror")
             ):
                 return False
             record["inflight"] += 1
             return key
         if current_owner != key[1]:
-            if cancelled and not success_committed and event not in ("cancel", "error", "apperror"):
+            if cancelled and not success_committed and event not in ("cancel", "apperror"):
                 return False
             return None
         record = STREAM_CANCEL_GENERATIONS.setdefault(
@@ -9377,7 +9377,7 @@ def admit_stream_publication(
             record.get("cancel_requested")
             and (record.get("reconcile_started") or cancelled)
             and not success_committed
-            and event not in ("cancel", "error", "apperror")
+            and event not in ("cancel", "apperror")
         ):
             return False
         record["inflight"] += 1
