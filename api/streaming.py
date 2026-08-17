@@ -2302,6 +2302,24 @@ def _preserve_late_recovered_rows_across_settlement(
             known_tool_keys.add(tool_key)
 
 
+def _merge_display_messages_with_late_recovery(
+    session,
+    merged_messages,
+    previous_messages,
+    previous_context_messages,
+    active_turn_identity,
+):
+    """Install the merged display and splice late recovery before annotation."""
+    session.messages = merged_messages
+    _preserve_late_recovered_rows_across_settlement(
+        session,
+        previous_messages,
+        previous_context_messages,
+        active_turn_identity,
+    )
+    return session.messages
+
+
 def _settle_result_messages(
     session,
     previous_messages,
@@ -2356,21 +2374,21 @@ def _settle_result_messages(
         session.context_messages,
         active_turn_identity,
     )
-    session.messages = _merge_display_messages_after_agent_result(
-        previous_display_for_writeback,
-        previous_context_messages,
-        _restore_display_reasoning_metadata(previous_messages, result_messages),
-        msg_text,
-        source=source,
-        verification_nudge_provenance=verification_nudge_provenance,
-    )
-    _annotate_media_snapshots_for_settled_messages(session.messages)
-    _preserve_late_recovered_rows_across_settlement(
+    session.messages = _merge_display_messages_with_late_recovery(
         session,
+        _merge_display_messages_after_agent_result(
+            previous_display_for_writeback,
+            previous_context_messages,
+            _restore_display_reasoning_metadata(previous_messages, result_messages),
+            msg_text,
+            source=source,
+            verification_nudge_provenance=verification_nudge_provenance,
+        ),
         previous_messages,
         previous_context_messages,
         active_turn_identity,
     )
+    _annotate_media_snapshots_for_settled_messages(session.messages)
     _compact_session_image_parts_for_persistence(session)
     _advance_truncation_watermark_after_commit(session)  # #3831
     return result_messages
