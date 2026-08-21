@@ -62,6 +62,14 @@ def _isolate_state(tmp_path, monkeypatch):
     getattr(config, "STREAM_CANCEL_RECONCILIATION_DEAD_LETTERS", []).clear()
 
 
+def _state_reconcile_result(rows, *, with_revision=False):
+    """Mirror the rebased state.db revision contract in local worker fakes."""
+    copied = copy.deepcopy(list(rows or []))
+    if with_revision:
+        return models.StateDBSessionMessagesSnapshot(messages=copied, revision=None)
+    return copied
+
+
 def _session(session_id: str, stream_id: str) -> Session:
     session = Session(
         session_id=session_id,
@@ -1368,7 +1376,14 @@ def test_local_cancel_before_flag_registration_stops_worker(tmp_path, monkeypatc
     monkeypatch.setattr(config, "_resolve_cli_toolsets", lambda *_args, **_kwargs: [])
     monkeypatch.setattr(streaming, "_build_session_db_for_stream", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(streaming, "get_state_db_session_messages", lambda *_args, **_kwargs: [])
-    monkeypatch.setattr(streaming, "reconciled_state_db_messages_for_session", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(
+        streaming,
+        "reconciled_state_db_messages_for_session",
+        lambda *_args, with_revision=False, **_kwargs: _state_reconcile_result(
+            [],
+            with_revision=with_revision,
+        ),
+    )
     monkeypatch.setattr(streaming, "warm_models_catalog_provenance_if_cold", lambda: None)
 
     errors = []
@@ -1552,7 +1567,14 @@ def test_local_cancel_finalizer_defers_until_cancel_records_user_boundary(tmp_pa
     monkeypatch.setattr(config, "_resolve_cli_toolsets", lambda *_args, **_kwargs: [])
     monkeypatch.setattr(streaming, "_build_session_db_for_stream", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(streaming, "get_state_db_session_messages", lambda *_args, **_kwargs: [])
-    monkeypatch.setattr(streaming, "reconciled_state_db_messages_for_session", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(
+        streaming,
+        "reconciled_state_db_messages_for_session",
+        lambda *_args, with_revision=False, **_kwargs: _state_reconcile_result(
+            [],
+            with_revision=with_revision,
+        ),
+    )
     monkeypatch.setattr(streaming, "warm_models_catalog_provenance_if_cold", lambda: None)
 
     def run_worker():
@@ -1775,9 +1797,18 @@ def test_local_cancel_finalizes_late_admitted_journal_after_empty_snapshot(tmp_p
     monkeypatch.setattr(streaming, "_build_session_db_for_stream", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(streaming, "get_state_db_session_messages", lambda *_args, **_kwargs: [])
 
-    def _reconciled_state_messages(current, *args, prefer_context=False, **kwargs):
+    def _reconciled_state_messages(
+        current,
+        *args,
+        prefer_context=False,
+        with_revision=False,
+        **kwargs,
+    ):
         field = "context_messages" if prefer_context else "messages"
-        return copy.deepcopy(getattr(current, field, None) or [])
+        return _state_reconcile_result(
+            getattr(current, field, None) or [],
+            with_revision=with_revision,
+        )
 
     monkeypatch.setattr(
         streaming,
@@ -2190,7 +2221,10 @@ def test_local_cancel_finalizes_late_admitted_journal_after_live_partial(tmp_pat
     monkeypatch.setattr(
         streaming,
         "reconciled_state_db_messages_for_session",
-        lambda *_args, **_kwargs: [],
+        lambda *_args, with_revision=False, **_kwargs: _state_reconcile_result(
+            [],
+            with_revision=with_revision,
+        ),
     )
     monkeypatch.setattr(streaming, "warm_models_catalog_provenance_if_cold", lambda: None)
 
@@ -2860,7 +2894,10 @@ def test_local_success_commit_late_stop_retires_old_generation(tmp_path, monkeyp
         monkeypatch.setattr(
             streaming,
             "reconciled_state_db_messages_for_session",
-            lambda *_args, **_kwargs: [],
+            lambda *_args, with_revision=False, **_kwargs: _state_reconcile_result(
+                [],
+                with_revision=with_revision,
+            ),
         )
         monkeypatch.setattr(streaming, "warm_models_catalog_provenance_if_cold", lambda: None)
 
@@ -3267,8 +3304,9 @@ def test_local_successor_cancel_after_success_save_preserves_detached_predecesso
     monkeypatch.setattr(
         streaming,
         "reconciled_state_db_messages_for_session",
-        lambda current, *args, prefer_context=False, **kwargs: copy.deepcopy(
-            getattr(current, "context_messages" if prefer_context else "messages", None) or []
+        lambda current, *args, prefer_context=False, with_revision=False, **kwargs: _state_reconcile_result(
+            getattr(current, "context_messages" if prefer_context else "messages", None) or [],
+            with_revision=with_revision,
         ),
     )
     monkeypatch.setattr(streaming, "warm_models_catalog_provenance_if_cold", lambda: None)
