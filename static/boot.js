@@ -164,7 +164,13 @@ function _isPhoneWidthViewport(){
 }
 
 function _isTouchKeyboardViewport(){
-  try{return matchMedia('(hover:none) and (pointer:coarse)').matches&&!_hasFinePointerCoexisting();}catch(_){return false;}
+  try{
+    if(!matchMedia('(hover:none) and (pointer:coarse)').matches) return false;
+    // Phone-sized touch devices keep virtual-keyboard treatment even
+    // when a stylus (S-Pen) or BT mouse exposes a fine pointer.
+    if(_isPhoneSizedTouchDevice()) return true;
+    return !_hasFinePointerCoexisting();
+  }catch(_){ return false; }
 }
 
 function _syncKeyboardBottomInset(){
@@ -2388,6 +2394,19 @@ window._isImeEnter=_isImeEnter;
 function _hasFinePointerCoexisting(){
   try{ return matchMedia('(any-pointer:fine)').matches; }catch(_){ return false; }
 }
+// A *phone-sized* touch-primary device is never "a tablet with a
+// hardware keyboard" — the fine pointer is a stylus (S-Pen on Galaxy Ultra)
+// or a paired BT mouse, not evidence of a physical keyboard. Only on
+// large-screen (tablet-class) touch devices does a co-existing fine pointer
+// mean desktop semantics are wanted. Without this, the S-Pen alone disabled
+// Enter=newline on Galaxy S23/S24/S25 Ultra phones.
+function _isPhoneSizedTouchDevice(){
+  try{
+    if(!matchMedia('(pointer:coarse)').matches) return false;
+    const w=Math.min(screen.width||0,screen.height||0);
+    return w>0&&w<=500;
+  }catch(_){ return false; }
+}
 function _isNumpadEnter(e){
   return e.key==='Enter'&&(e.code==='NumpadEnter'||e.location===KeyboardEvent.DOM_KEY_LOCATION_NUMPAD);
 }
@@ -2421,11 +2440,13 @@ $('msg').addEventListener('keydown',e=>{
   // The 'ctrl+enter' and 'shift+enter' settings also use this behavior
   // (plain Enter = newline).
   // Users can override in Settings by explicitly choosing 'enter' mode.
+  // A phone-sized touch device (S-Pen stylus, BT mouse) is still a
+  // phone — Enter stays newline there even if a fine pointer co-exists.
   if(e.key==='Enter'){
     if(_isImeEnter(e)){return;}
     const isNumpadEnter=_isNumpadEnter(e);
-    const _mobileDefault=matchMedia('(pointer:coarse)').matches
-      &&!_hasFinePointerCoexisting()
+    const _mobileDefault=(matchMedia('(pointer:coarse)').matches
+      &&(_isPhoneSizedTouchDevice()||!_hasFinePointerCoexisting()))
       &&window._sendKey==='enter';
     if(window._sendKey==='shift+enter'){
       if(e.shiftKey){e.preventDefault();send();}
