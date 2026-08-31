@@ -2394,17 +2394,11 @@ window._isImeEnter=_isImeEnter;
 function _hasFinePointerCoexisting(){
   try{ return matchMedia('(any-pointer:fine)').matches; }catch(_){ return false; }
 }
-// A *phone-sized* touch-primary device is never "a tablet with a
-// hardware keyboard" — the fine pointer is a stylus (S-Pen on Galaxy Ultra)
-// or a paired BT mouse, not evidence of a physical keyboard. Only on
-// large-screen (tablet-class) touch devices does a co-existing fine pointer
-// mean desktop semantics are wanted. Without this, the S-Pen alone disabled
-// newline-on-Enter on Galaxy S23/S24/S25 Ultra phones.
-//
-// `screen.width`/`screen.height` are CSS pixels on every mainstream mobile
-// browser (they do NOT scale with devicePixelRatio), so a single px threshold
-// is stable across DPRs. Do not substitute visualViewport geometry here:
-// that changes with the on-screen keyboard and pinch zoom.
+// A fine pointer on a phone-sized touch device is a stylus (S-Pen on
+// Galaxy Ultra) or a paired BT mouse, not a hardware keyboard — phones
+// keep phone behavior. Tablet-class touch screens keep the fine-pointer
+// guard. screen.* is in CSS pixels (stable across devicePixelRatio); do
+// not use visualViewport here — it moves with the keyboard and zoom.
 const _PHONE_MAX_MIN_SIDE_PX=500;
 function _isPhoneSizedTouchDevice(){
   try{
@@ -2436,18 +2430,12 @@ $('msg').addEventListener('keydown',e=>{
     }
   }
   // Send key: respect user preference.
-  // On touch-primary devices (coarse pointer, no fine pointer co-existing),
-  // default to Enter = newline regardless of whether the visual viewport has
-  // shrunk. The viewport-shrink heuristic (_isVirtualKeyboardLikelyOpen) was
-  // unreliable on iOS Safari and some Android browsers where the keyboard
-  // doesn't consistently reduce vv.height by >120px. The pointer media query
-  // pair is a sufficient and more reliable signal for "software keyboard only".
-  // Hardware keyboards on tablets are covered by _hasFinePointerCoexisting.
-  // The 'ctrl+enter' and 'shift+enter' settings also use this behavior
-  // (plain Enter = newline).
-  // Users can override in Settings by explicitly choosing 'enter' mode.
-  // A phone-sized touch device (S-Pen stylus, BT mouse) is still a
-  // phone — Enter stays newline there even if a fine pointer co-exists.
+  // On touch-primary devices plain Enter inserts a newline (software
+  // keyboard); a hardware keyboard on a tablet-class screen exposes a
+  // fine pointer and restores Enter-sends. A phone with a stylus (S-Pen)
+  // or BT mouse still counts as a phone. The 'ctrl+enter'/'shift+enter'
+  // settings also make plain Enter a newline; users can override the
+  // default in Settings.
   if(e.key==='Enter'){
     if(_isImeEnter(e)){return;}
     const isNumpadEnter=_isNumpadEnter(e);
