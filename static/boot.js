@@ -2399,12 +2399,18 @@ function _hasFinePointerCoexisting(){
 // or a paired BT mouse, not evidence of a physical keyboard. Only on
 // large-screen (tablet-class) touch devices does a co-existing fine pointer
 // mean desktop semantics are wanted. Without this, the S-Pen alone disabled
-// Enter=newline on Galaxy S23/S24/S25 Ultra phones.
+// newline-on-Enter on Galaxy S23/S24/S25 Ultra phones.
+//
+// `screen.width`/`screen.height` are CSS pixels on every mainstream mobile
+// browser (they do NOT scale with devicePixelRatio), so a single px threshold
+// is stable across DPRs. Do not substitute visualViewport geometry here:
+// that changes with the on-screen keyboard and pinch zoom.
+const _PHONE_MAX_MIN_SIDE_PX=500;
 function _isPhoneSizedTouchDevice(){
   try{
     if(!matchMedia('(pointer:coarse)').matches) return false;
     const w=Math.min(screen.width||0,screen.height||0);
-    return w>0&&w<=500;
+    return w>0&&w<=_PHONE_MAX_MIN_SIDE_PX;
   }catch(_){ return false; }
 }
 function _isNumpadEnter(e){

@@ -42,10 +42,13 @@ function extractFunction(source, name) {
   throw new Error('function body not closed for ' + name);
 }
 
-// Extract the real production predicates.
+// Extract the real production predicates plus the named phone-size constant.
 const fns = ['_hasFinePointerCoexisting', '_isPhoneSizedTouchDevice', '_isTouchKeyboardViewport']
   .map((n) => extractFunction(src, n))
   .join('\n');
+const constMatch = src.match(/^const _PHONE_MAX_MIN_SIDE_PX\s*=\s*[^;]+;/m);
+if (!constMatch) throw new Error('_PHONE_MAX_MIN_SIDE_PX constant not found');
+const declarations = constMatch[0];
 
 // Extract the keydown handler's Enter decision block: from the
 // "if(e.key==='Enter'){" guard (the send-key one, after the autocomplete
@@ -91,7 +94,7 @@ globalThis.send = () => { sentCount += 1; };
 const results = [];
 for (const profile of args.profiles) {
   makeEnv(profile);
-  eval(fns);
+  eval(declarations + '\n' + fns);
   const phone = _isPhoneSizedTouchDevice();
   const vk = _isTouchKeyboardViewport();
 
